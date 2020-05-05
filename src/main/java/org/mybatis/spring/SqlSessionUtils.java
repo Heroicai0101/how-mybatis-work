@@ -15,8 +15,6 @@
  */
 package org.mybatis.spring;
 
-import static org.springframework.util.Assert.notNull;
-
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.ExecutorType;
@@ -31,6 +29,8 @@ import org.springframework.dao.support.PersistenceExceptionTranslator;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import static org.springframework.util.Assert.notNull;
 
 /**
  * Handles MyBatis SqlSession life cycle. It can register and get SqlSessions from Spring
@@ -96,14 +96,17 @@ public final class SqlSessionUtils {
 
     SqlSessionHolder holder = (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
 
+    // 第一次请求，holder为null，故返回的 SqlSession 为null
     SqlSession session = sessionHolder(executorType, holder);
     if (session != null) {
       return session;
     }
 
+    // session若为null，则 new DefaultSqlSession(), 并将 autoCommit设置为false(即关闭自动提交)
     LOGGER.debug(() -> "Creating a new SqlSession");
     session = sessionFactory.openSession(executorType);
 
+    // 绑定到 TransactionSynchronizationManager
     registerSessionHolder(sessionFactory, executorType, exceptionTranslator, session);
 
     return session;
@@ -115,7 +118,7 @@ public final class SqlSessionUtils {
    * Note: The DataSource used by the Environment should be synchronized with the transaction either through
    * DataSourceTxMgr or another tx synchronization. Further assume that if an exception is thrown, whatever started the
    * transaction will handle closing / rolling back the Connection associated with the SqlSession.
-   * 
+   *
    * @param sessionFactory
    *          sqlSessionFactory used for registration.
    * @param executorType

@@ -15,13 +15,13 @@
  */
 package org.mybatis.spring.mapper;
 
-import static org.springframework.util.Assert.notNull;
-
 import org.apache.ibatis.executor.ErrorContext;
 import org.apache.ibatis.session.Configuration;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.mybatis.spring.support.SqlSessionDaoSupport;
 import org.springframework.beans.factory.FactoryBean;
+
+import static org.springframework.util.Assert.notNull;
 
 /**
  * BeanFactory that enables injection of MyBatis mapper interfaces. It can be set up with a SqlSessionFactory or a
@@ -53,6 +53,7 @@ import org.springframework.beans.factory.FactoryBean;
  */
 public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements FactoryBean<T> {
 
+  // 在生成 MapperFactoryBean 的Bean定义时，通过构造参数传入
   private Class<T> mapperInterface;
 
   private boolean addToConfig = true;
@@ -66,17 +67,22 @@ public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements Factor
   }
 
   /**
+   * afterPropertiesSet() 会触发此方法；
+   * 这个方法的目的就是提前构建好每一个 Mapper的 MapperProxyFactory 缓存; 后面Spring再调用 getObject() 时就直接从缓存取
    * {@inheritDoc}
    */
   @Override
   protected void checkDaoConfig() {
+    // 检查 sqlSessionTemplate 不能为null
     super.checkDaoConfig();
 
     notNull(this.mapperInterface, "Property 'mapperInterface' is required");
 
+    // getSqlSession() 返回的是 sqlSessionTemplate
     Configuration configuration = getSqlSession().getConfiguration();
     if (this.addToConfig && !configuration.hasMapper(this.mapperInterface)) {
       try {
+        // 核心: 不存在则构建 MapperProxyFactory 并放入 MapperRegistry 的缓存
         configuration.addMapper(this.mapperInterface);
       } catch (Exception e) {
         logger.error("Error while adding the mapper '" + this.mapperInterface + "' to configuration.", e);
@@ -88,10 +94,14 @@ public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements Factor
   }
 
   /**
+   * 返回的是 MapperProxy<AMapper> 对象，自身实现了 InvocationHandler 接口
    * {@inheritDoc}
    */
   @Override
   public T getObject() throws Exception {
+    // getSqlSession() 返回的是 sqlSessionTemplate
+    // sqlSessionTemplate.getMapper() 最终执行的是 sqlSessionFactory.getConfiguration().getMapper()
+    // 故最终就是 mapperRegistry.getMapper() ; 这个 mapperRegistry 就是checkDaoConfig()方法里面提到的缓存
     return getSqlSession().getMapper(this.mapperInterface);
   }
 

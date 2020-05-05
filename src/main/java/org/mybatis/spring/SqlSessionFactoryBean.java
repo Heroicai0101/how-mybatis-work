@@ -97,14 +97,17 @@ public class SqlSessionFactoryBean
 
   private Configuration configuration;
 
+  // mapper这些xml文件路径
   private Resource[] mapperLocations;
 
+  // 数据源
   private DataSource dataSource;
 
   private TransactionFactory transactionFactory;
 
   private Properties configurationProperties;
 
+  // 自己就new出来了，不用传入
   private SqlSessionFactoryBuilder sqlSessionFactoryBuilder = new SqlSessionFactoryBuilder();
 
   private SqlSessionFactory sqlSessionFactory;
@@ -482,11 +485,14 @@ public class SqlSessionFactoryBean
    */
   @Override
   public void afterPropertiesSet() throws Exception {
+    // 数据源不能为null
     notNull(dataSource, "Property 'dataSource' is required");
+    // 自己new出来的
     notNull(sqlSessionFactoryBuilder, "Property 'sqlSessionFactoryBuilder' is required");
     state((configuration == null && configLocation == null) || !(configuration != null && configLocation != null),
         "Property 'configuration' and 'configLocation' can not specified with together");
 
+    // 核心点: 解析xml文件, 绑定到 Configuration， 然后new DefaultSqlSessionFactory(config);
     this.sqlSessionFactory = buildSqlSessionFactory();
   }
 
@@ -596,6 +602,7 @@ public class SqlSessionFactoryBean
         this.transactionFactory == null ? new SpringManagedTransactionFactory() : this.transactionFactory,
         this.dataSource));
 
+    // 配置了 mapper xml 文件地址
     if (this.mapperLocations != null) {
       if (this.mapperLocations.length == 0) {
         LOGGER.warn(() -> "Property 'mapperLocations' was specified but matching resources are not found.");
@@ -607,6 +614,8 @@ public class SqlSessionFactoryBean
           try {
             XMLMapperBuilder xmlMapperBuilder = new XMLMapperBuilder(mapperLocation.getInputStream(),
                 targetConfiguration, mapperLocation.toString(), targetConfiguration.getSqlFragments());
+            // 解析xml文件: Configuration 绑定mapper命名空间、解析 resultMap、Statement
+            // ﻿注意mapper的命名空间同 Mapper接口全限定类名保持一致
             xmlMapperBuilder.parse();
           } catch (Exception e) {
             throw new NestedIOException("Failed to parse mapping resource: '" + mapperLocation + "'", e);
